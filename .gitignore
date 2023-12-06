@@ -8,3 +8,5 @@ STEM.egg-info/*
 .coverage
 .tox/*
 docs/build/*
+work/tmp/
+tmp_geometry_file.html
