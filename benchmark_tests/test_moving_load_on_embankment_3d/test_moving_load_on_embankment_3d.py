@@ -1,4 +1,6 @@
 import os
+import sys
+
 from stem.model import Model
 from stem.soil_material import OnePhaseSoil, LinearElasticSoil, SoilMaterial, SaturatedBelowPhreaticLevelLaw
 from stem.load import MovingLoad
@@ -50,6 +52,9 @@ def test_stem():
     no_displacement_parameters = DisplacementConstraint(active=[True, True, True],
                                                         is_fixed=[True, True, True], value=[0, 0, 0])
     roller_displacement_parameters = DisplacementConstraint(active=[True, True, True], is_fixed=[True, False, True], value=[0, 0, 0])
+
+    model.synchronise_geometry()
+    model.show_geometry(show_surface_ids=True)
 
     # Add boundary conditions to the model (geometry ids are shown in the show_geometry)
     model.add_boundary_condition_by_geometry_ids(2, [1], no_displacement_parameters, "base_fixed")
@@ -114,8 +119,14 @@ def test_stem():
     # --------------------------------
     stem.run_calculation()
 
-    result = assert_files_equal("benchmark_tests/test_moving_load_on_embankment_3d/output_/output_vtk_porous_computational_model_part",
-                                os.path.join(input_folder, "output/output_vtk_porous_computational_model_part"))
+    if sys.platform == "win32":
+        expected_output_dir = "benchmark_tests/test_moving_load_on_embankment_3d/output_windows/output_vtk_porous_computational_model_part"
+    elif sys.platform == "linux":
+        expected_output_dir = "benchmark_tests/test_moving_load_on_embankment_3d/output_linux/output_vtk_porous_computational_model_part"
+    else:
+        raise Exception("Unknown platform")
+
+    result = assert_files_equal(expected_output_dir, os.path.join(input_folder, "output/output_vtk_porous_computational_model_part"))
 
     assert result is True
     rmtree(input_folder)
