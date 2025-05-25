@@ -1,6 +1,9 @@
 from typing import Dict, List, Sequence, Any
 from enum import Enum
 
+import numpy as np
+import numpy.typing as npty
+
 from stem.globals import ELEMENT_DATA
 from stem.utils import Utils
 
@@ -27,7 +30,9 @@ class MeshSettings:
         - __element_order (int): The element order. 1 for linear elements, 2 for quadratic elements. (default 1)
     """
 
-    def __init__(self, element_size: float = -1, element_order: int = 1,
+    def __init__(self,
+                 element_size: float = -1,
+                 element_order: int = 1,
                  element_shape: ElementShape = ElementShape.TRIANGLE):
         """
         Initialize the mesh settings.
@@ -83,6 +88,7 @@ class Node:
         - coordinates (Sequence[float]): node coordinates
 
     """
+
     def __init__(self, id: int, coordinates: Sequence[float]):
         """
         Initialize the node.
@@ -93,6 +99,24 @@ class Node:
         """
         self.id: int = id
         self.coordinates: Sequence[float] = coordinates
+
+    def __eq__(self, other: object) -> bool:
+        """
+        Check if two nodes are equal. Nodes are considered equal if their ids and coordinates are equal.
+
+        Args:
+            - other (object): The other node.
+
+        Returns:
+            - bool: True if the nodes are equal, False otherwise.
+
+        """
+        # check if the other object is an instance of the Node class
+        if not isinstance(other, Node):
+            return False
+
+        # check if the id and coordinates are equal
+        return self.id == other.id and np.isclose(self.coordinates, other.coordinates).all().item()
 
 
 class Element:
@@ -118,6 +142,25 @@ class Element:
         self.id: int = id
         self.element_type: str = element_type
         self.node_ids: List[int] = node_ids
+
+    def __eq__(self, other: object) -> bool:
+        """
+        Check if two elements are equal. Elements are considered equal if their ids, element types and node ids are
+        equal.
+
+        Args:
+            - other (object): The other element.
+
+        Returns:
+            - bool: True if the elements are equal, False otherwise.
+        """
+
+        # check if the other object is an instance of the Element class
+        if not isinstance(other, Element):
+            return False
+
+        # check if the id, element type and node ids are equal
+        return self.id == other.id and self.element_type == other.element_type and self.node_ids == other.node_ids
 
 
 class Mesh:
@@ -164,6 +207,24 @@ class Mesh:
         else:
             return super().__getattribute__(item)
 
+    def __eq__(self, other: object) -> bool:
+        """
+        Check if two meshes are equal. Two meshes are considered equal if their nodes and elements are equal.
+
+        Args:
+            - other (object): The other mesh.
+
+        Returns:
+            - bool: True if the meshes are equal, False otherwise.
+
+        """
+        # check if the other object is an instance of the Mesh class
+        if not isinstance(other, Mesh):
+            return False
+
+        # check if the number of dimensions, nodes and elements are equal
+        return self.ndim == other.ndim and self.nodes == other.nodes and self.elements == other.elements
+
     @classmethod
     def create_mesh_from_gmsh_group(cls, mesh_data: Dict[str, Any], group_name: str) -> "Mesh":
         """
@@ -196,9 +257,10 @@ class Mesh:
         nodes: Dict[int, Node] = {node_id: Node(node_id, mesh_data["nodes"][node_id]) for node_id in group_node_ids}
 
         # create element per element id
-        elements: Dict[int, Element] = {element_id: Element(element_id, group_element_type,
-                                                            mesh_data["elements"][group_element_type][element_id])
-                                        for element_id in group_data["element_ids"]}
+        elements: Dict[int, Element] = {
+            element_id: Element(element_id, group_element_type, mesh_data["elements"][group_element_type][element_id])
+            for element_id in group_data["element_ids"]
+        }
 
         # In 2D check if vertices of element are clockwise and flip element if they are
         if len(group_element_ids) > 0 and group_data["ndim"] == 2:
@@ -224,3 +286,37 @@ class Mesh:
         mesh.elements = elements
 
         return mesh
+
+    def calculate_centroids(self) -> npty.NDArray[np.float64]:
+        """
+        Calculate the centroids of all elements
+
+        Returns:
+            - npty.NDArray[np.float64]: centroids of all elements
+        """
+
+        centroids: npty.NDArray[np.float64] = np.mean([[self.nodes[nid].coordinates for nid in el.node_ids]
+                                                       for el in self.elements.values()],
+                                                      axis=1)
+
+        return centroids
+
+    def find_elements_connected_to_nodes(self) -> Dict[int, List[int]]:
+        """
+        Creates a dictionary of node ids as keys and a list of element ids which are connected to the node as values.
+
+
+        Returns:
+            - Dict[int, List[int]]: dictionary containing node ids as keys and  a list of element ids which are
+            connected to the node as values.
+
+        """
+
+        # find which elements are connected to each node
+        node_to_elements: Dict[int, List[int]] = {node_id: [] for node_id in self.nodes.keys()}
+
+        for element_id, element in self.elements.items():
+            for node_id in element.node_ids:
+                node_to_elements[node_id].append(element_id)
+
+        return node_to_elements

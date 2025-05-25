@@ -3,11 +3,9 @@ requires = ["setuptools>=42", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [tool.pytest.ini_options]
-addopts = "--cov=tests"
 testpaths = ["./tests"]
 
 [tool.mypy]
-mypy_path = "stem"
 check_untyped_defs = true
 disallow_any_generics = true
 ignore_missing_imports = true
@@ -19,3 +17,6 @@ warn_return_any = true
 warn_unreachable = true
 warn_unused_configs = true
 no_implicit_reexport = true
+
+[tool.black]
+force-exclude = '\.py$'

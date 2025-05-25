@@ -1,4 +1,4 @@
-from typing import List, Any, Optional, Union
+from typing import List, Any, Optional
 from dataclasses import dataclass, field
 from abc import ABC
 
@@ -47,6 +47,7 @@ class FluidProperties:
     DYNAMIC_VISCOSITY: float = 1.3e-3
     BULK_MODULUS_FLUID: float = 2e9
 
+
 @dataclass
 class OnePhaseSoil(SoilFormulationParametersABC):
     """
@@ -60,13 +61,18 @@ class OnePhaseSoil(SoilFormulationParametersABC):
         - DENSITY_SOLID (float): The density of the solid material [kg/m^3].
         - POROSITY (float): The porosity of the soil [-].
         - BULK_MODULUS_SOLID (float): The bulk modulus of the solid material [Pa].
-        - BIOT_COEFFICIENT (float): The Biot coefficient [-].
+        - BIOT_COEFFICIENT (Optional[float]): The Biot coefficient [-].
+        - RAYLEIGH_M (Optional[float]): Mass proportional Rayleigh damping parameter [-].
+        - RAYLEIGH_K (Optional[float]): Stiffness proportional Rayleigh damping parameter [-].
     """
     IS_DRAINED: bool
     DENSITY_SOLID: float
     POROSITY: float
     BULK_MODULUS_SOLID: float = 50e9
     BIOT_COEFFICIENT: Optional[float] = None
+
+    RAYLEIGH_M: Optional[float] = None
+    RAYLEIGH_K: Optional[float] = None
 
 
 @dataclass
@@ -84,10 +90,12 @@ class TwoPhaseSoil(SoilFormulationParametersABC):
         - PERMEABILITY_YY (float): The permeability in the y-direction [m^2].
         - PERMEABILITY_XY (float): The permeability in the xy-direction [m^2].
         - BULK_MODULUS_SOLID (float): The bulk modulus of the solid material [Pa].
-        - BIOT_COEFFICIENT (float): The Biot coefficient [-].
-        - PERMEABILITY_YZ (float): The permeability in the yz-direction [m^2].
-        - PERMEABILITY_ZX (float): The permeability in the zx-direction [m^2].
-        - PERMEABILITY_ZZ (float): The permeability in the z-direction [m^2].
+        - BIOT_COEFFICIENT (Optional[float]): The Biot coefficient [-].
+        - RAYLEIGH_M (Optional[float]): Mass proportional rayleigh damping parameter [-].
+        - RAYLEIGH_K (Optional[float]): Stiffness proportional rayleigh damping parameter [-].
+        - PERMEABILITY_YZ (Optional[float]): The permeability in the yz-direction [m^2].
+        - PERMEABILITY_ZX (Optional[float]): The permeability in the zx-direction [m^2].
+        - PERMEABILITY_ZZ (Optional[float]): The permeability in the z-direction [m^2].
     """
     DENSITY_SOLID: float
     POROSITY: float
@@ -96,6 +104,8 @@ class TwoPhaseSoil(SoilFormulationParametersABC):
     PERMEABILITY_XY: float = 0
     BULK_MODULUS_SOLID: float = 50e9
     BIOT_COEFFICIENT: Optional[float] = None
+    RAYLEIGH_M: Optional[float] = None
+    RAYLEIGH_K: Optional[float] = None
 
     # parameters for 3D
     PERMEABILITY_YZ: Optional[float] = 0
@@ -275,8 +285,7 @@ class SoilMaterial:
             2: [3, 4, 6, 8],
             3: [4, 8, 10, 20],
         }
-        Utils.check_ndim_nnodes_combinations(n_dim_model, n_nodes_element, available_node_dim_combinations,
-                                             "Soil")
+        Utils.check_ndim_nnodes_combinations(n_dim_model, n_nodes_element, available_node_dim_combinations, "Soil")
 
         if analysis_type == AnalysisType.MECHANICAL_GROUNDWATER_FLOW or analysis_type == AnalysisType.MECHANICAL:
 

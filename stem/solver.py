@@ -70,6 +70,7 @@ class DisplacementConvergenceCriteria(ConvergenceCriteriaABC):
         """
         return "displacement_criterion"
 
+
 @dataclass
 class ResidualConvergenceCriteria(ConvergenceCriteriaABC):
     """
@@ -127,6 +128,7 @@ class WaterPressureConvergenceCriteria(ConvergenceCriteriaABC):
             - str: The type of the water pressure convergence criterion
         """
         return "water_pressure_criterion"
+
 
 @dataclass
 class DisplacementAndWaterPressureConvergenceCriteria(ConvergenceCriteriaABC):
@@ -245,7 +247,7 @@ class StrategyTypeABC(ABC):
 
     @property
     @abc.abstractmethod
-    def strategy_type(self):
+    def strategy_type(self) -> str:
         """
         Abstract property for returning the type of the strategy
 
@@ -253,6 +255,37 @@ class StrategyTypeABC(ABC):
             - Exception: abstract class of strategy type is called
         """
         raise Exception("abstract class of strategy type is called")
+
+
+@dataclass
+class LinearNewtonRaphsonStrategy(StrategyTypeABC):
+    """
+    Class containing information about the Newton-Raphson strategy for linear systems
+
+    Attributes:
+        - max_iterations (int): maximum number of iterations allowed, if this number is reached, the time step size is\
+            decreased and the algorithm is restarted. Default value is 15.
+        - min_iterations (int): minimum number of iterations, below this number, the time step size is increased.\
+            Default value is 6.
+        - number_cycles (int): number of allowed cycles of decreasing the time step size until the algorithm is \
+            stopped. Default value is 100.
+
+    Inheritance:
+        - :class:`StrategyTypeABC`
+    """
+    max_iterations: int = 15
+    min_iterations: int = 6
+    number_cycles: int = 100
+
+    @property
+    def strategy_type(self) -> str:
+        """
+        Returns the strategy type name of the Linear Newton-Raphson strategy
+
+        Returns:
+            - str: strategy type name
+        """
+        return "newton_raphson_linear_elastic"
 
 
 @dataclass
@@ -265,8 +298,8 @@ class NewtonRaphsonStrategy(StrategyTypeABC):
             decreased and the algorithm is restarted. Default value is 15.
         - min_iterations (int): minimum number of iterations, below this number, the time step size is increased.\
             Default value is 6.
-        - number_cycles (int): number of allowed cycles of decreasing the time step size until the algorithm is stopped.\
-            Default value is 100.
+        - number_cycles (int): number of allowed cycles of decreasing the time step size until the algorithm is \
+            stopped. Default value is 100.
 
     Inheritance:
         - :class:`StrategyTypeABC`
@@ -276,7 +309,7 @@ class NewtonRaphsonStrategy(StrategyTypeABC):
     number_cycles: int = 100
 
     @property
-    def strategy_type(self):
+    def strategy_type(self) -> str:
         """
         Returns the strategy type name of the Newton-Raphson strategy
 
@@ -299,8 +332,8 @@ class LineSearchStrategy(StrategyTypeABC):
             decreased and the algorithm is restarted. Default value is 15.
         - min_iterations (int): minimum number of iterations, below this number, the time step size is increased.\
             Default value is 6.
-        - number_cycles (int): number of allowed cycles of decreasing the time step size until the algorithm is stopped.\
-            Default value is 100.
+        - number_cycles (int): number of allowed cycles of decreasing the time step size until the algorithm \
+            is stopped. Default value is 100.
         - max_line_search_iterations (int): maximum number of line search iterations. Default value is 10.
         - first_alpha_value (float): first alpha guess value used for the first iteration. Default value is 1.0.
         - second_alpha_value (float): second alpha guess value used for the first iteration. Default value is 0.5.
@@ -322,7 +355,7 @@ class LineSearchStrategy(StrategyTypeABC):
     echo_level: int = 0
 
     @property
-    def strategy_type(self):
+    def strategy_type(self) -> str:
         """
         Returns the strategy type name of the line search strategy
 
@@ -345,8 +378,8 @@ class ArcLengthStrategy(StrategyTypeABC):
             decreased and the algorithm is restarted. Default value is 15.
         - min_iterations (int): minimum number of iterations, below this number, the time step size is increased.\
             Default value is 6.
-        - number_cycles (int): number of allowed cycles of decreasing the time step size until the algorithm is stopped.\
-            Default value is 100.
+        - number_cycles (int): number of allowed cycles of decreasing the time step size until the algorithm \
+            is stopped. Default value is 100.
         - desired_iterations (int): This is used to calculate the radius of the next step. Default value is 10.
         - max_radius_factor (float): maximum radius factor of the arc. Default value is 1.0.
         - min_radius_factor (float): minimum radius factor of the arc. Default value is 0.1.
@@ -360,7 +393,7 @@ class ArcLengthStrategy(StrategyTypeABC):
     min_radius_factor: float = 0.1
 
     @property
-    def strategy_type(self):
+    def strategy_type(self) -> str:
         """
         Returns the strategy type name of the arc length strategy
 
@@ -393,7 +426,7 @@ class LinearSolverSettingsABC(ABC):
 @dataclass
 class Amgcl(LinearSolverSettingsABC):
     """
-    Class containing information about the amgcl linear solver settings
+    Class containing information about the Algebraic multigrid iterative linear solver settings
 
     Inheritance:
         - :class:`LinearSolverSettingsABC`
@@ -401,24 +434,85 @@ class Amgcl(LinearSolverSettingsABC):
     Attributes:
         - scaling (bool): if true, the system matrix will be scaled before solving the linear system of equations.\
             Default value is False.
-        - tolerance (float): tolerance for the linear solver convergence criteria. Default value is 1e-6.
+        - tolerance (float): tolerance for the linear solver convergence criteria. Default value is 1e-12.
         - max_iteration (int): maximum number of iterations for the linear solver. Default value is 1000.
+        - krylov_type (str): type of the Krylov solver. Default value is "cg", other options are "gmres" and "bicgstab".
 
     """
     scaling: bool = False
-    tolerance: float = 1e-6
+    tolerance: float = 1e-12
     max_iteration: int = 1000
+    krylov_type: str = "cg"
 
     @property
     def solver_type(self):
         """
-        Property for returns the solver type name of the amgcl linear solver settings
+        Property that returns the solver type name of the amgcl iterative linear solver settings
 
         Returns:
             - str: solver type name
 
         """
         return "amgcl"
+
+
+@dataclass
+class Cg(LinearSolverSettingsABC):
+    """
+    Class containing information about the conjugate gradient iterative linear solver settings
+
+    Inheritance:
+        - :class:`LinearSolverSettingsABC`
+
+    Attributes:
+        - scaling (bool): if true, the system matrix will be scaled before solving the linear system of equations.\
+            Default value is False.
+        - tolerance (float): tolerance for the linear solver convergence criteria. Default value is 1e-12.
+        - max_iteration (int): maximum number of iterations for the linear solver. Default value is 1000.
+
+    """
+    scaling: bool = False
+    tolerance: float = 1e-12
+    max_iteration: int = 1000
+
+    @property
+    def solver_type(self):
+        """
+        Property that returns the solver type name of the conjugate gradient iterative linear solver settings
+
+        Returns:
+            - str: solver type name
+
+        """
+        return "cg"
+
+
+@dataclass
+class Lu(LinearSolverSettingsABC):
+    """
+    Class containing information about the LU decomposition direct linear solver settings
+
+    Inheritance:
+        - :class:`LinearSolverSettingsABC`
+
+    Attributes:
+        - scaling (bool): if true, the system matrix will be scaled before solving the linear system of equations.\
+            Default value is False.
+
+    """
+    scaling: bool = False
+
+    @property
+    def solver_type(self):
+        """
+        Property that returns the solver type name of the LU decomposition direct linear solver settings
+
+        Returns:
+            - str: solver type name
+
+        """
+
+        return "LinearSolversApplication.sparse_lu"
 
 
 @dataclass
@@ -484,15 +578,17 @@ class SolverSettings:
             the gauss points. Default value is True.
         - strategy_type (:class:`StrategyTypeABC`): strategy type, :class:`NewtonRaphsonStrategy`, \
             :class:`LineSearchStrategy` or :class:`ArcLengthStrategy`. Default value is :class:`NewtonRaphsonStrategy`.
-        - scheme (:class:`SchemeABC`): scheme, :class:`NewmarkSceme` or :class:`BackwardEulerScheme`. Default value \
-            is :class:`NewmarkSceme`.
-        - linear_solver_settings (:class:`LinearSolverSettingsABC`): linear solver settings, currently only \
-            :class:`Amgcl` is supported
+        - scheme (:class:`SchemeABC`): scheme, :class:`NewmarkScheme` or :class:`BackwardEulerScheme`. Default value \
+            is :class:`NewmarkScheme`.
+        - linear_solver_settings (:class:`LinearSolverSettingsABC`): linear solver settings, :class:`Amgcl` \
+            :class:`Cg`, :class:`Lu`. Default value is :class:`Amgcl`.
         - rayleigh_m (Optional[float]): mass proportional damping parameter
         - rayleigh_k (Optional[float]): stiffness proportional damping parameter
         - echo_level (int): echo level. Default value is 1. If 0, only time information is printed. If 1, time \
             information and convergence information are printed. If 2, time information, convergence information, \
             intermediate rhs results and linear solver settings are printed.
+        - _inititalize_acceleration (bool): if true, the acceleration is initialized at the beginning of the stage, \
+            this value should not be changed by the user.
     """
     analysis_type: AnalysisType
     solution_type: SolutionType
@@ -511,10 +607,12 @@ class SolverSettings:
     rayleigh_m: Optional[float] = None
     rayleigh_k: Optional[float] = None
     echo_level: int = 1
+    _inititalize_acceleration: bool = False
 
-    def __post_init__(self):
+    def validate_settings(self):
         """
-        Post initialization method
+        Validates the solver settings, and changes settings when needed. If the solution type is quasi-static, the time
+        integration scheme is set to Backward Euler.
 
         Raises:
             - ValueError: if the Rayleigh damping parameters are not provided for dynamic analysis
@@ -526,6 +624,17 @@ class SolverSettings:
 
             if self.stress_initialisation_type == StressInitialisationType.K0_PROCEDURE:
                 raise ValueError("Kratos Multiphysics does not support the K0-procedure for dynamic analysis")
+
+        elif self.solution_type == SolutionType.QUASI_STATIC:
+            Warning("In quasi-static analysis, the time integration scheme is set to Backward Euler. And the strategy "
+                    "type is set to Newton-Raphson")
+            self.scheme = BackwardEulerScheme()
+            self.strategy_type = NewtonRaphsonStrategy()
+
+            # todo remove this once updated in Kratos
+            # mass and damping matrices are set to not constant, as they are not used in quasi static analysis. This
+            # prevents the calling of the wrong function in the Kratos model
+            self.are_mass_and_damping_constant = False
 
 
 @dataclass
@@ -543,4 +652,3 @@ class Problem:
     problem_name: str
     number_of_threads: int
     settings: SolverSettings
-

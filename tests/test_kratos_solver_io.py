@@ -1,6 +1,10 @@
+import os
+import sys
 import json
-
+import site
 import pytest
+
+import UVEC.uvec_ten_dof_vehicle_2D as uvec
 
 from stem.IO.kratos_solver_io import KratosSolverIO
 from stem.model_part import ModelPart, BodyModelPart
@@ -24,8 +28,12 @@ class TestKratosSolverIO:
 
         solution_type = SolutionType.DYNAMIC
 
-        time_integration = TimeIntegration(start_time=0.0, end_time=1.0, delta_time=0.1, reduction_factor=0.5,
-                                           increase_factor=2.0, max_delta_time_factor=500)
+        time_integration = TimeIntegration(start_time=0.0,
+                                           end_time=1.0,
+                                           delta_time=0.1,
+                                           reduction_factor=0.5,
+                                           increase_factor=2.0,
+                                           max_delta_time_factor=500)
 
         convergence_criterion = DisplacementConvergenceCriteria(displacement_relative_tolerance=1e-5,
                                                                 displacement_absolute_tolerance=1e-7)
@@ -38,13 +46,17 @@ class TestKratosSolverIO:
 
         stress_initialisation_type = StressInitialisationType.NONE
 
-        solver_settings = SolverSettings(analysis_type=analysis_type, solution_type=solution_type,
+        solver_settings = SolverSettings(analysis_type=analysis_type,
+                                         solution_type=solution_type,
                                          stress_initialisation_type=stress_initialisation_type,
                                          time_integration=time_integration,
-                                         is_stiffness_matrix_constant=True, are_mass_and_damping_constant=True,
+                                         is_stiffness_matrix_constant=True,
+                                         are_mass_and_damping_constant=True,
                                          convergence_criteria=convergence_criterion,
-                                         strategy_type=strategy_type, scheme=scheme_type,
-                                         linear_solver_settings=linear_solver_settings, rayleigh_k=0.001,
+                                         strategy_type=strategy_type,
+                                         scheme=scheme_type,
+                                         linear_solver_settings=linear_solver_settings,
+                                         rayleigh_k=0.001,
                                          rayleigh_m=0.001)
 
         return solver_settings
@@ -125,9 +137,14 @@ class TestKratosSolverIO:
         # set up uvec load
         uvec_parameters = {"load_wheel_1": -10.0, "load_wheel_2": -20.0}
         uvec_state_variables = {"state_1": [0.0, 1.0], "state_2": [9, 8]}
-        uvec_load = UvecLoad(direction=[1, 1, 0], velocity=5, origin=[0.0, 1.0, 0.0], wheel_configuration=[0.0, 2.0],
-                             uvec_file=r"sample_uvec.py", uvec_function_name="uvec_test",
-                             uvec_parameters=uvec_parameters, uvec_state_variables=uvec_state_variables)
+        uvec_load = UvecLoad(direction=[1, 1, 0],
+                             velocity=5,
+                             origin=[0.0, 1.0, 0.0],
+                             wheel_configuration=[0.0, 2.0],
+                             uvec_file=r"sample_uvec.py",
+                             uvec_function_name="uvec_test",
+                             uvec_parameters=uvec_parameters,
+                             uvec_state_variables=uvec_state_variables)
 
         uvec_model_part.parameters = uvec_load
 
@@ -140,12 +157,86 @@ class TestKratosSolverIO:
         solver_io = KratosSolverIO(3, "testDomain")
 
         # create settings dictionary
-        test_dict = solver_io.create_settings_dictionary(problem_data, "mesh_test_name",
-                                                         "material_test_name.json", model_parts)
+        test_dict = solver_io.create_settings_dictionary(problem_data, "mesh_test_name", "material_test_name.json",
+                                                         model_parts)
 
         # open expected settings dictionary
         with open("tests/test_data/expected_solver_settings_with_uvec.json") as f:
             expected_solver_settings = json.load(f)
+
+        # assert that the settings dictionary is as expected
+        TestUtils.assert_dictionary_almost_equal(expected_solver_settings, test_dict)
+
+        # check if correct linear elastic strategy is used
+        solver_settings.strategy_type = LinearNewtonRaphsonStrategy()
+        test_dict = solver_io.create_settings_dictionary(problem_data, "mesh_test_name", "material_test_name.json",
+                                                         model_parts)
+
+        assert test_dict["solver_settings"]["strategy_type"] == "newton_raphson_linear_elastic_with_uvec"
+
+        solver_settings.solution_type = SolutionType.QUASI_STATIC
+        test_dict = solver_io.create_settings_dictionary(problem_data, "mesh_test_name", "material_test_name.json",
+                                                         model_parts)
+        assert test_dict["solver_settings"]["strategy_type"] == "newton_raphson_with_uvec"
+
+    def test_create_settings_dictionary_with_uvec_package(self, set_solver_settings: SolverSettings):
+        """
+        Test the creation of the problem data and solver settings dictionary including uvec data.
+        This test compares a created dictionary with a reference dictionary.
+
+        Args:
+            - set_solver_settings (SolverSettings): solver settings for testing
+
+        """
+
+        solver_settings = set_solver_settings
+
+        # set up uvec model part
+        uvec_model_part = ModelPart("UvecModelPart")
+
+        # set up uvec load
+        uvec_parameters = {"load_wheel_1": -10.0, "load_wheel_2": -20.0}
+        uvec_state_variables = {"state_1": [0.0, 1.0], "state_2": [9, 8]}
+        uvec_load = UvecLoad(direction=[1, 1, 0],
+                             velocity=5,
+                             origin=[0.0, 1.0, 0.0],
+                             wheel_configuration=[0.0, 2.0],
+                             uvec_model=uvec,
+                             uvec_parameters=uvec_parameters,
+                             uvec_state_variables=uvec_state_variables)
+
+        uvec_model_part.parameters = uvec_load
+
+        model_parts = [uvec_model_part]
+
+        # set up problem data
+        problem_data = Problem(problem_name="test", number_of_threads=2, settings=solver_settings)
+
+        # create solver IO
+        solver_io = KratosSolverIO(3, "testDomain")
+
+        # create settings dictionary
+        test_dict = solver_io.create_settings_dictionary(problem_data, "mesh_test_name", "material_test_name.json",
+                                                         model_parts)
+
+        # open expected settings dictionary
+        with open("tests/test_data/expected_solver_settings_with_uvec_package.json") as f:
+            expected_solver_settings = json.load(f)
+
+        # update the expected_solver_settings uvec path
+        if sys.platform == "win32":
+            package_loc = site.getsitepackages()[1]
+        elif sys.platform == "linux":
+            package_loc = site.getsitepackages()[0]
+
+        # update the path to the uvec file on the test file
+        expected_solver_settings['solver_settings']['uvec']['uvec_path'] = os.path.normcase(
+            os.path.normpath(
+                os.path.join(package_loc, "UVEC", expected_solver_settings['solver_settings']['uvec']['uvec_path'])))
+
+        # normalise the path to be case-insensitive
+        test_dict['solver_settings']['uvec']['uvec_path'] = os.path.normcase(
+            test_dict['solver_settings']['uvec']['uvec_path'])
 
         # assert that the settings dictionary is as expected
         TestUtils.assert_dictionary_almost_equal(expected_solver_settings, test_dict)

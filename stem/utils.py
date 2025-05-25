@@ -11,16 +11,22 @@ if TYPE_CHECKING:
     from stem.mesh import Element, Mesh
     from stem.geometry import Geometry
 
+NUMBER_TYPES = (int, float, np.int64, np.float64)
+"""
+TypeAlias:
+    - NUMBER_TYPES: Tuple[int, float, np.int64, np.float64]
+"""
+
 
 class Utils:
     """
     Class containing utility methods.
 
     """
+
     @staticmethod
     def check_ndim_nnodes_combinations(n_dim: int, n_nodes_element: Optional[int],
-                                       available_combinations: Dict[int, List[Any]],
-                                       class_name: str):
+                                       available_combinations: Dict[int, List[Any]], class_name: str):
         """
         Check if the combination of number of global dimensions and number of nodes per element is supported.
 
@@ -45,8 +51,7 @@ class Utils:
         if n_nodes_element not in available_combinations[n_dim]:
             raise ValueError(
                 f"In {n_dim} dimensions, only {available_combinations[n_dim]} noded {class_name} elements are "
-                f"supported. {n_nodes_element} nodes were provided."
-            )
+                f"supported. {n_nodes_element} nodes were provided.")
 
     @staticmethod
     def are_2d_coordinates_clockwise(coordinates: Sequence[Sequence[float]]) -> bool:
@@ -72,7 +77,7 @@ class Utils:
         return signed_area > 0.0
 
     @staticmethod
-    def check_dimensions(points:Sequence[Sequence[float]]) -> None:
+    def check_dimensions(points: Sequence[Sequence[float]]) -> None:
         """
 
         Check if points have the same dimensions (2D or 3D).
@@ -96,7 +101,9 @@ class Utils:
             raise ValueError("Dimension of the points should be 2D or 3D.")
 
     @staticmethod
-    def is_collinear(point: Sequence[float], start_point: Sequence[float], end_point: Sequence[float],
+    def is_collinear(point: Sequence[float],
+                     start_point: Sequence[float],
+                     end_point: Sequence[float],
                      a_tol: float = 1e-06) -> bool:
         """
         Check if point is aligned with the other two on a line. Points must have the same dimension (2D or 3D)
@@ -128,7 +135,8 @@ class Utils:
         return is_collinear
 
     @staticmethod
-    def is_point_between_points(point:Sequence[float], start_point:Sequence[float], end_point:Sequence[float]) -> bool:
+    def is_point_between_points(point: Sequence[float], start_point: Sequence[float], end_point: Sequence[float]) \
+            -> bool:
         """
         Check if point is between the other two. Points must have the same dimension (2D or 3D).
 
@@ -152,7 +160,7 @@ class Utils:
         vec_2 = np.asarray(end_point) - np.asarray(start_point)
 
         # Calculate the scalar projections of vector1 onto vector2
-        scalar_projection = sum(v1 * v2 for v1, v2 in zip(vec_1, vec_2)) / sum(v ** 2 for v in vec_2)
+        scalar_projection = sum(v1 * v2 for v1, v2 in zip(vec_1, vec_2)) / sum(v**2 for v in vec_2)
 
         # Check if the scalar projection is between 0 and 1 (inclusive)
         is_between: bool = 0 <= scalar_projection <= 1
@@ -244,8 +252,8 @@ class Utils:
         """
 
         # get nodal connectivities of the line edges from the local element edges dictionary
-        node_ids: npty.NDArray[np.int64] = np.array(element.node_ids, dtype=int)[
-            ELEMENT_DATA[element.element_type]["edges"]]
+        node_ids: npty.NDArray[np.int64] = np.array(element.node_ids,
+                                                    dtype=int)[ELEMENT_DATA[element.element_type]["edges"]]
 
         return node_ids
 
@@ -375,16 +383,69 @@ class Utils:
                     f"+ {initial_value}")
 
     @staticmethod
+    def create_box_tiny_expr(transition_parameter: float,
+                             start_peak: float,
+                             end_peak: float,
+                             peak_value: float,
+                             base_value: float,
+                             variable: str = "x") -> str:
+        """
+        Creates a tiny expression for a hyperbolic approximation of the box function. For more information on tiny
+        expressions, see: https://github.com/codeplea/tinyexpr
+
+        Args:
+            - transition_parameter (float): parameter to control the transition of the box function, \
+              the higher the value, the steeper the transition
+            - start_peak (float): start of the peak of the box function
+            - end_peak (float): end of the peak of the box function
+            - peak_value (float): value of the peak of the box function
+            - base_value (float): value of the base of the box function
+            - variable (str): variable within the box function tinyexpr, default is "x", other options are "y", "z", "t"
+
+        Raises:
+            - ValueError: when start peak is larger or equal to end peak
+            - ValueError: when variable is not "x", "y", "z" or "t"
+
+        Returns:
+            - str: tiny expression of the box function
+
+        """
+
+        if start_peak >= end_peak:
+            raise ValueError("Start peak should be smaller than end peak.")
+
+        if variable not in ["x", "y", "z", "t"]:
+            raise ValueError("Variable should be either 'x', 'y', 'z' or 't'.")
+
+        length_peak = end_peak - start_peak
+        centre_peak = (start_peak + end_peak) / 2
+
+        tiny_expr = (
+            f"(1 / 2 + 1 / 2 * tanh({transition_parameter} * ({variable} - ({centre_peak - length_peak / 2}) ))"
+            f" - (1 / 2 + 1 / 2 * tanh({transition_parameter} * ({variable} - ({centre_peak + length_peak / 2}) ))))"
+            f" * ({peak_value - base_value}) + {base_value}")
+
+        return tiny_expr
+
+    @staticmethod
     def check_lines_geometry_are_path(geometry: Optional['Geometry']) -> bool:
         """
-        Checks if lines are connected forming a path without:
 
-            a) disconnected lines,   b) branching out paths
-                o---o       o---o              o
-                |                              |
-                o                         o----o----o
-                                               |
-                                               o
+        Checks if lines are connected forming a path without:
+          a) disconnected lines,
+          b) branching out paths::
+
+              a) Disconnected lines:
+                  o---o
+                  |
+                  o
+
+              b) Branching out paths:
+                  o---o
+                       |
+                  o----o----o
+                       |
+                       o
 
         Args:
             - geometry (:class:`stem.geometry.Geometry`): geometry to be checked.
@@ -407,32 +468,21 @@ class Utils:
         # if 2 or more lines check for branching points/loops and discontinuities
         if len(geometry.lines) > 1:
 
-            # get the line ids and points in the line
-            lines = {_id: line.point_ids for _id, line in geometry.lines.items()}
+            # find which lines are connected to which point
+            lines_to_point: Dict[int, List[int]] = {point_id: [] for point_id in geometry.points.keys()}
+            for line_id, line in geometry.lines.items():
+                for point_id in line.point_ids:
+                    lines_to_point[point_id].append(line_id)
 
-            # get the unique points in the line
-            unique_points = list(set([n for v in lines.values() for n in v]))
+            # check if the lines are connected without branches
+            for line_ids in lines_to_point.values():
 
-            # loop over the points and find the lines connected to the point
-            for p in unique_points:
-
-                # initialise list of lines connected to the point
-                line_to_point = []
-
-                # find which lines contain the point
-                for line_id, points_line in lines.items():
-
-                    if p in points_line:
-                        line_to_point.append(line_id)
-
-                # when more than 2 lines are connected to the point a branching point or loop
-                # is found, so the geometry is not a path. Return False.
-                if len(line_to_point) > 2:
-                    # "Branching point was found for node {p} connected to lines {line_to_point}
+                # if more than 2 lines are connected to the point a branching point or loop is found
+                if len(line_ids) > 2:
                     return False
 
             # if no branching point are found than the check of connectivity holds when
-            if len(unique_points) != (len(lines) + 1):
+            if len(lines_to_point) != (len(geometry.lines) + 1):
                 # lines are not connected.
                 return False
 
@@ -459,13 +509,13 @@ class Utils:
 
         for ix in range(len(coordinates)):
             # check origin is collinear to the edges of the line
-            collinear_check = Utils.is_collinear(
-                point=origin, start_point=coordinates[ix][0], end_point=coordinates[ix][1]
-            )
+            collinear_check = Utils.is_collinear(point=origin,
+                                                 start_point=coordinates[ix][0],
+                                                 end_point=coordinates[ix][1])
             # check origin is between the edges of the line (edges included)
-            is_between_check = Utils.is_point_between_points(
-                point=origin, start_point=coordinates[ix][0], end_point=coordinates[ix][1]
-            )
+            is_between_check = Utils.is_point_between_points(point=origin,
+                                                             start_point=coordinates[ix][0],
+                                                             end_point=coordinates[ix][1])
             # check if point complies
             is_on_line = collinear_check and is_between_check
             # exit at the first success of the test (point in the line) and return True
@@ -498,7 +548,7 @@ class Utils:
 
     @staticmethod
     def find_node_ids_close_to_geometry_nodes(mesh: 'Mesh', geometry: 'Geometry', eps: float = 1e-6) \
-            -> npty.NDArray[np.int64]:
+            -> npty.NDArray[np.uint64]:
         """
         Searches the nodes in the mesh close to the point of a given geometry.
 
@@ -508,7 +558,7 @@ class Utils:
             - eps (float): tolerance for searching close nodes.
 
         Returns:
-            - npty.NDArray[np.int64]: list of ids of the nodes close to the geometry points
+            - npty.NDArray[np.uint64]: list of ids of the nodes close to the geometry points
 
         """
         # retrieve ids and coordinates of the nodes
@@ -523,5 +573,190 @@ class Utils:
         tree = cKDTree(coordinates)
 
         # find the ids of the nodes in the model that are close to the specified coordinates.
-        close_indices = tree.query_ball_point(output_coordinates, np.ones(output_coordinates.shape[0]) * eps, p=2.)
-        return np.array(node_ids)[np.hstack(close_indices, dtype=np.int64)]
+        _, close_indices = tree.query(output_coordinates, k=1, distance_upper_bound=eps)
+
+        close_node_ids: npty.NDArray[np.uint64] = np.array(node_ids, dtype=np.uint64)[close_indices]
+
+        return close_node_ids
+
+    @staticmethod
+    def find_first_three_non_collinear_points(points: Sequence[Sequence[float]],
+                                              a_tol: float = 1e-06) -> Optional[Sequence[Sequence[float]]]:
+        """
+        Find the first 3 non-collinear points in sequence of points. If all are collinear, the function returns `None`.
+
+        Args:
+            - points (Sequence[Sequence[float]]): points from which the non-collinear points should be searched for.
+            - a_tol (float): absolute tolerance to check collinearity (default 1e-6)
+
+        Raises:
+            -  ValueError: if less than three points are provided.
+
+        Returns:
+            - Optional[List[Sequence[float]]]: list of the first three points that are not collinear. If all are
+            collinear, None is returned.
+
+        """
+        if len(points) < 3:
+            raise ValueError("Less than 3 points are provided.")
+
+        # select the first 2 points in the sequence
+        p1 = points[0]
+        p2 = points[1]
+
+        for p_candidate in points[2:]:
+            # the first point that is not collinear with the first 2, is returned altogether with p1 and p2
+            if not Utils.is_collinear(p_candidate, p1, p2, a_tol=a_tol):
+                return [p1, p2, p_candidate]
+        # all are collinear, None is returned
+        return None
+
+    @staticmethod
+    def is_point_coplanar_to_polygon(point: Sequence[float],
+                                     polygon_points: Sequence[Sequence[float]],
+                                     a_tol: float = 1e-06) -> bool:
+        """
+        Checks whether a point is coplanar to a list of points defining a polygon
+
+        Args:
+            - point (Sequence[float]): point to be checked.
+            - polygon_points (Sequence[Sequence[float]]): points belonging to the polygon.
+            - a_tol (float): absolute tolerance to check planarity (default 1e-6)
+
+        Raises:
+            -  ValueError: if the polygon itself is not planar.
+            -  ValueError: if all the points in the polygon are collinear.
+
+        Returns:
+            - bool: whether the point is coplanar with the polygon.
+
+        """
+
+        # check that polygon is coplanar
+        if not Utils.is_polygon_planar(polygon_points=polygon_points, a_tol=a_tol):
+            raise ValueError("Points in the polygon are not co-planar.")
+
+        # Choose three non-collinear points from the polygon
+
+        non_collinear_points = Utils.find_first_three_non_collinear_points(points=polygon_points, a_tol=a_tol)
+
+        if non_collinear_points is None:
+            raise ValueError("All the points in the polygon are collinear.")
+
+        # Convert points to a NumPy array for easier manipulation
+        p1, p2, p3 = np.array(non_collinear_points)
+
+        # Calculate vectors from p1 to p2 and p1 to p3
+        v1 = p2 - p1
+        v2 = p3 - p1
+
+        # Calculate the normal vector of the plane formed by v1 and v2
+        normal = np.cross(v1, v2)
+
+        # Transform point in numpy array
+        point_array = np.array(point)
+
+        # Calculate the vector from p1 to the current point
+        vector_to_point = point_array - p1
+
+        # Calculate the dot product of normal and vector_to_point
+        dot_product = np.dot(normal, vector_to_point)
+
+        # If the dot product is not close to 0 (within a small tolerance),
+        # the points are not coplanar
+        if not np.isclose(dot_product, 0, atol=a_tol):
+            return False
+        return True
+
+    @staticmethod
+    def is_polygon_planar(polygon_points: Sequence[Sequence[float]], a_tol: float = 1e-06) -> bool:
+        """
+        Checks whether a polygon is planar, i.e. all its point lie on the same plane.
+
+        Args:
+            - polygon_points (Sequence[Sequence[float]]): points belonging to the polygon.
+            - a_tol (float): absolute tolerance to check planarity (default 1e-6)
+
+        Raises:
+            -  ValueError: if less than three points are provided.
+            -  ValueError: if all the points in the polygon are collinear.
+
+        Returns:
+            - bool: whether the polygon is planar.
+
+        """
+        if len(polygon_points) < 3:
+            raise ValueError("Less than 3 points are given, the shape is not a polygon.")
+
+        # get the first 3 non-collinear points in polygon
+        non_collinear_points = Utils.find_first_three_non_collinear_points(points=polygon_points, a_tol=a_tol)
+
+        if non_collinear_points is None:
+            raise ValueError("All the points in the polygon are collinear.")
+
+        # 3 non-collinear points form always a unique plane
+        if len(polygon_points) == 3:
+            return True
+
+        # Convert points to a NumPy array for easier manipulation
+        non_collinear_points_array = np.array(non_collinear_points)
+
+        # Choose the first three non-collinear points
+        p1, p2, p3 = non_collinear_points_array[:3]
+
+        # Calculate vectors from p1 to p2 and p1 to p3
+        v1 = p2 - p1
+        v2 = p3 - p1
+
+        # Calculate the normal vector of the plane formed by v1 and v2
+        normal = np.cross(v1, v2)
+
+        # Check if all other points lie on the plane
+        for point in polygon_points:
+
+            point_array = np.array(point)
+            # Calculate the vector from p1 to the current point
+            vector_to_point = point_array - p1
+
+            # Calculate the dot product of normal and vector_to_point
+            dot_product = np.dot(normal, vector_to_point)
+
+            # If the dot product is not close to 0 (within a small tolerance),
+            # the points are not coplanar
+            if not np.isclose(dot_product, 0, atol=a_tol):
+                return False
+
+        # If the dot product is 0, the point is on the plane
+        return True
+
+    @staticmethod
+    def validate_coordinates(coordinates: Union[Sequence[Sequence[float]], npty.NDArray[np.float64]]):
+        """
+        Validates the coordinates in input.
+
+        Args:
+            - coordinates (Sequence[Sequence[float]]): The coordinates of the load.
+
+        Raises:
+            - ValueError: if coordinates is not a sequence real numbers.
+            - ValueError: if coordinates is not convertible to a 2D array (i.e. a sequence of sequences)
+            - ValueError: if the number of elements (number of coordinates) is not 3.
+
+        """
+
+        # if is not an array, make it array!
+        if not isinstance(coordinates, np.ndarray):
+            coordinates = np.array(coordinates, dtype=np.float64)
+
+        if len(coordinates.shape) != 2:
+            raise ValueError("Coordinates are not a sequence of a sequence or a 2D array.")
+
+        if coordinates.shape[1] != 3:
+            raise ValueError(f"Coordinates should be 3D but {coordinates.shape[1]} coordinates were given.")
+
+        # check if coordinates are real numbers
+        for coordinate in coordinates:
+            for i in coordinate:
+                if not isinstance(i, NUMBER_TYPES) or np.isnan(i) or np.isinf(i):
+                    raise ValueError(f"Coordinates should be a sequence of sequence of real numbers, "
+                                     f"but {i} was given.")

@@ -8,6 +8,7 @@ from tests.utils import TestUtils
 
 
 class TestKratosMaterialIO:
+
     def test_write_soil_material_dict(self):
         """
         Test writing a material list to json. In this test, the material list contains a UMAT and a UDSM material.
@@ -42,6 +43,16 @@ class TestKratosMaterialIO:
             POROSITY=0.3,
             BULK_MODULUS_SOLID=1e16,
             BIOT_COEFFICIENT=0.5,
+        )
+
+        one_phase_rayleigh = OnePhaseSoil(
+            ndim=ndim,
+            IS_DRAINED=True,
+            DENSITY_SOLID=2650,
+            POROSITY=0.3,
+            BULK_MODULUS_SOLID=1e16,
+            RAYLEIGH_M=1,
+            RAYLEIGH_K=2,
         )
 
         # Define retention law parameters
@@ -82,10 +93,22 @@ class TestKratosMaterialIO:
             PERMEABILITY_YZ=3,
         )
 
-        # Define two phase constitutive law parameters
-        two_phase_constitutive_parameters = LinearElasticSoil(
-            YOUNG_MODULUS=1e9, POISSON_RATIO=0.3
+        two_phase_rayleigh = TwoPhaseSoil(
+            ndim=3,
+            DENSITY_SOLID=2650,
+            POROSITY=0.3,
+            PERMEABILITY_XX=1e-15,
+            PERMEABILITY_YY=1e-15,
+            PERMEABILITY_ZZ=1e-15,
+            PERMEABILITY_XY=1,
+            PERMEABILITY_ZX=2,
+            PERMEABILITY_YZ=3,
+            RAYLEIGH_M=1,
+            RAYLEIGH_K=2,
         )
+
+        # Define two phase constitutive law parameters
+        two_phase_constitutive_parameters = LinearElasticSoil(YOUNG_MODULUS=1e9, POISSON_RATIO=0.3)
         two_phase_retention_parameters = SaturatedBelowPhreaticLevelLaw()
 
         # Create materials
@@ -103,6 +126,13 @@ class TestKratosMaterialIO:
             retention_parameters=udsm_retention_parameters,
         )
 
+        one_phase_rayleigh_material = SoilMaterial(
+            name="test_one_phase_rayleigh_material",
+            soil_formulation=one_phase_rayleigh,
+            constitutive_law=umat_constitutive_parameters,
+            retention_parameters=umat_retention_parameters,
+        )
+
         two_phase_material_2D = SoilMaterial(
             name="test_two_phase_material_2D",
             soil_formulation=two_phase_formulation_2D,
@@ -117,11 +147,20 @@ class TestKratosMaterialIO:
             retention_parameters=two_phase_retention_parameters,
         )
 
+        two_phase_rayleigh_material = SoilMaterial(
+            name="test_two_phase_rayleigh_material",
+            soil_formulation=two_phase_rayleigh,
+            constitutive_law=two_phase_constitutive_parameters,
+            retention_parameters=two_phase_retention_parameters,
+        )
+
         all_materials = {
             "test_umat_material": umat_material,
             "test_udsm_material": udsm_material,
+            "test_one_phase_rayleigh_material": one_phase_rayleigh_material,
             "test_two_phase_material_2D": two_phase_material_2D,
             "test_two_phase_material_3D": two_phase_material_3D,
+            "test_two_phase_rayleigh_material": two_phase_rayleigh_material,
         }
 
         # write json file
@@ -133,17 +172,12 @@ class TestKratosMaterialIO:
                     part_name=part_name,
                     material=material_parameters,
                     material_id=ix + 1,
-                )
-            )
+                ))
 
-        expected_material_parameters_json = json.load(
-            open("tests/test_data/expected_material_parameters.json")
-        )
+        expected_material_parameters_json = json.load(open("tests/test_data/expected_material_parameters.json"))
 
         # compare json files using custom dictionary comparison
-        TestUtils.assert_dictionary_almost_equal(
-            expected_material_parameters_json, test_dict
-        )
+        TestUtils.assert_dictionary_almost_equal(expected_material_parameters_json, test_dict)
 
     def test_write_structural_material_dict(self):
         """
@@ -162,6 +196,18 @@ class TestKratosMaterialIO:
             I33=1,
         )
 
+        # define euler beam parameters with rayleigh parameters
+        beam_material_parameters_rayleigh = EulerBeam(
+            ndim=ndim,
+            DENSITY=1.0,
+            YOUNG_MODULUS=1.0,
+            POISSON_RATIO=0.2,
+            CROSS_AREA=1.0,
+            I33=1,
+            RAYLEIGH_M=0.1,
+            RAYLEIGH_K=0.2,
+        )
+
         # define spring damper parameters
         spring_damper_material_parameters = ElasticSpringDamper(
             NODAL_DISPLACEMENT_STIFFNESS=[1.0, 2, 3],
@@ -178,9 +224,10 @@ class TestKratosMaterialIO:
         )
 
         # Create structural materials
-        beam_material = StructuralMaterial(
-            name="test_beam_material", material_parameters=beam_material_parameters
-        )
+        beam_material = StructuralMaterial(name="test_beam_material", material_parameters=beam_material_parameters)
+        beam_material_rayleigh = StructuralMaterial(name="test_beam_material_rayleigh",
+                                                    material_parameters=beam_material_parameters_rayleigh)
+
         spring_damper_material = StructuralMaterial(
             name="test_spring_damper_material",
             material_parameters=spring_damper_material_parameters,
@@ -192,6 +239,7 @@ class TestKratosMaterialIO:
 
         all_materials = {
             "test_beam_material": beam_material,
+            "test_beam_material_rayleigh": beam_material_rayleigh,
             "test_spring_damper_material": spring_damper_material,
             "test_nodal_concentrated_material": nodal_concentrated_material,
         }
@@ -207,14 +255,10 @@ class TestKratosMaterialIO:
                     part_name=part_name,
                     material=material_parameters,
                     material_id=ix + 1,
-                )
-            )
+                ))
 
         expected_material_parameters_json = json.load(
-            open("tests/test_data/expected_structural_material_parameters.json")
-        )
+            open("tests/test_data/expected_structural_material_parameters.json"))
 
         # compare json files using custom dictionary comparison
-        TestUtils.assert_dictionary_almost_equal(
-            expected_material_parameters_json, test_dict
-        )
+        TestUtils.assert_dictionary_almost_equal(expected_material_parameters_json, test_dict)

@@ -7,6 +7,61 @@ from uvec_ten_dof_vehicle_2D.hertzian_contact import HertzianContact
 from uvec_ten_dof_vehicle_2D.newmark_solver import NewmarkExplicit
 
 
+def uvec_static(json_string: str) -> str:
+    """
+
+    Args:
+        - json_string (str): json string containing the uvec data
+
+    Returns:
+        - str: json string containing the load data
+    """
+
+    # Get the uvec data
+    uvec_data = json.loads(json_string)
+
+    # load the data
+    u = uvec_data["u"]
+    theta = uvec_data["theta"]
+    time_index = uvec_data["time_index"]
+    time_step = uvec_data["dt"]
+    state = uvec_data["state"]
+
+    # Get the uvec parameters
+    parameters = uvec_data["parameters"]
+
+    # initialise the train system
+    (M, C, K, F_train), train = initialise(time_index, parameters, state)
+
+    # calculate norm of u vector, gravity is downwards
+    gravity_axis = parameters["gravity_axis"]
+
+    u_vertical = [u[uw][gravity_axis] for uw in u.keys()]
+
+    # calculate static displacement
+    u_static = train.calculate_initial_displacement(K, F_train, u_vertical)
+
+    state["u"] = u_static
+    state["v"] = np.zeros_like(u_static)
+    state["a"] = np.zeros_like(u_static)
+
+    # calculate contact forces
+    F_contact = calculate_contact_forces(u_vertical, train.calculate_static_contact_force(), state, parameters, train,
+                                         time_index)
+
+    # calculate force vector
+    F = F_train
+    F[train.contact_dofs] = F[train.contact_dofs] + F_contact
+
+    # calculate unit vector
+    aux = {}
+    for i, val in enumerate(F_contact):
+        aux[i + 1] = [0., (-val).tolist(), 0.]
+    uvec_data["loads"] = aux
+
+    return json.dumps(uvec_data)
+
+
 def uvec(json_string: str) -> str:
     """
     Args:
@@ -32,7 +87,6 @@ def uvec(json_string: str) -> str:
     # initialise the train system
     (M, C, K, F_train), train = initialise(time_index, parameters, state)
 
-
     # calculate norm of u vector, gravity is downwards
     gravity_axis = parameters["gravity_axis"]
 
@@ -53,8 +107,8 @@ def uvec(json_string: str) -> str:
     state["previous_time"] += time_step
 
     # calculate contact forces
-    F_contact = calculate_contact_forces(u_vertical, train.calculate_static_contact_force(),
-                                         state, parameters, train, time_index)
+    F_contact = calculate_contact_forces(u_vertical, train.calculate_static_contact_force(), state, parameters, train,
+                                         time_index)
 
     # calculate force vector
     F = F_train
@@ -72,7 +126,6 @@ def uvec(json_string: str) -> str:
     for i, val in enumerate(F_contact):
         aux[i + 1] = [0., (-val).tolist(), 0.]
     uvec_data["loads"] = aux
-
 
     # write to file to compare the results
     file_name = uvec_data["parameters"]["file_name"]
@@ -95,7 +148,6 @@ def initialise(time_index: int, parameters: dict, state: dict) -> \
     Returns:
         - Tuple[Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray], TrainModel]: tuple containing the global matrices (M, C, K, F) and the train model
     """
-
 
     train = TrainModel()
 
@@ -120,12 +172,11 @@ def initialise(time_index: int, parameters: dict, state: dict) -> \
     # set global matrices
     K, C, M, F = train.generate_global_matrices()
 
-
     return (M, C, K, F), train
 
 
-def calculate_contact_forces(u: np.ndarray, F_static: np.ndarray, state: dict, parameters: dict,
-                             train: TrainModel, time_index: int) -> np.ndarray:
+def calculate_contact_forces(u: np.ndarray, F_static: np.ndarray, state: dict, parameters: dict, train: TrainModel,
+                             time_index: int) -> np.ndarray:
     """
     Calculate the contact forces
 

@@ -1,6 +1,9 @@
+import os
 from typing import List, Dict, Any, Union, Optional
 from dataclasses import dataclass, field
 from abc import ABC, abstractmethod
+from enum import Enum
+from types import ModuleType
 
 import numpy as np
 
@@ -8,6 +11,7 @@ from stem.globals import GRAVITY_VALUE, VERTICAL_AXIS
 from stem.solver import AnalysisType
 from stem.table import Table
 from stem.utils import Utils
+
 
 @dataclass
 class LoadParametersABC(ABC):
@@ -124,8 +128,7 @@ class LineLoad(LoadParametersABC):
             2: [2, 3],
             3: [2, 3],
         }
-        Utils.check_ndim_nnodes_combinations(n_dim_model, n_nodes_element, available_node_dim_combinations,
-                                             "Line load")
+        Utils.check_ndim_nnodes_combinations(n_dim_model, n_nodes_element, available_node_dim_combinations, "Line load")
 
         if analysis_type == AnalysisType.MECHANICAL_GROUNDWATER_FLOW or analysis_type == AnalysisType.MECHANICAL:
             if n_dim_model == 2 and n_nodes_element > 2:
@@ -244,6 +247,21 @@ class MovingLoad(LoadParametersABC):
 
         return element_name
 
+
+class UvecSupportedModels(Enum):
+    """
+    Enum class containing the supported UVEC models.
+
+    Inheritance:
+        - :class:`Enum`
+    Attributes:
+        - TEN_DOF (str): 10 degrees of freedom UVEC model.
+        - TWO_DOF (str): 2 degrees of freedom UVEC model.
+    """
+    TEN_DOF = "UVEC.uvec_ten_dof_vehicle_2D"
+    TWO_DOF = "UVEC.uvec_two_dof_vehicle_2D"
+
+
 @dataclass
 class UvecLoad(LoadParametersABC):
     """
@@ -257,22 +275,35 @@ class UvecLoad(LoadParametersABC):
         - velocity (Union[float, str]): Velocity of the moving load [m/s].
         - origin (List[float]): Starting coordinates of the first wheel [m].
         - wheel_configuration (List[float]): Wheel configuration, i.e. distances from the origin of each wheel [m].
-        - uvec_file (str): Path to the UVEC file.
-        - uvec_function_name (str): Name of the UVEC function.
         - uvec_parameters (Dict[str, Any]): Parameters of the UVEC function.
         - uvec_state_variables (Dict[str, Any]): State variables of the UVEC function.
-
-
+        - uvec_model (ModuleType): UVEC model.
+        - uvec_file (str): Path to the UVEC file.
+        - uvec_function_name (str): Name of the UVEC function.
     """
 
     direction: List[float]
     velocity: Union[float, str]
     origin: List[float]
     wheel_configuration: List[float]
-    uvec_file: str
-    uvec_function_name: str
     uvec_parameters: Dict[str, Any] = field(default_factory=dict)
     uvec_state_variables: Dict[str, Any] = field(default_factory=dict)
+    uvec_model: Union[ModuleType, Any] = None
+    uvec_file: str = ""
+    uvec_function_name: str = ""
+
+    def __post_init__(self):
+        """
+        Check if the UVEC model is supported in STEM.
+        """
+        if self.uvec_model is not None:
+            if self.uvec_model.__name__ not in (model.value for model in UvecSupportedModels):
+                raise ValueError(
+                    f"UVEC model {self.uvec_model} is not supported. Please use one of the following models: \
+                        {[model.value for model in UvecSupportedModels]}")
+            self.uvec_file = os.path.join(self.uvec_model.get_path_file(self.uvec_model.UVEC_NAME), "uvec.py")
+            self.uvec_function_name = "uvec"
+            self.uvec_model = None  # necessary to allow for a deep copy for a stage in Kratos
 
     @staticmethod
     def get_element_name(n_dim_model: int, n_nodes_element: int, analysis_type: AnalysisType) -> Optional[str]:
@@ -285,8 +316,7 @@ class UvecLoad(LoadParametersABC):
             2: [2, 3],
             3: [2, 3],
         }
-        Utils.check_ndim_nnodes_combinations(n_dim_model, n_nodes_element, available_node_dim_combinations,
-                                             "UVEC load")
+        Utils.check_ndim_nnodes_combinations(n_dim_model, n_nodes_element, available_node_dim_combinations, "UVEC load")
 
         if analysis_type == AnalysisType.MECHANICAL_GROUNDWATER_FLOW or analysis_type == AnalysisType.MECHANICAL:
             element_name = f"MovingLoadCondition{n_dim_model}D{n_nodes_element}N"
@@ -294,6 +324,7 @@ class UvecLoad(LoadParametersABC):
             raise ValueError("UVEC load can only be applied in mechanical or mechanical groundwater flow analysis")
 
         return element_name
+
 
 @dataclass
 class GravityLoad(LoadParametersABC):

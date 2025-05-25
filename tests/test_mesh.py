@@ -1,10 +1,14 @@
-import pytest
+from copy import deepcopy
 
+import pytest
+import numpy as np
 import numpy.testing as npt
+
 from stem.mesh import *
 
 
 class TestMesh:
+
     def test_create_0d_mesh_from_gmsh_group(self):
         """
         Test the creation of a 0D mesh from a gmsh group.
@@ -14,10 +18,23 @@ class TestMesh:
         # Set up the mesh data
         mesh_data = {
             "ndim": 0,
-            "nodes": {1: [0, 0, 0], 2: [0.5, 0, 0]},
-            "elements": {"POINT_1N": {1: [1], 2: [2]}},
+            "nodes": {
+                1: [0, 0, 0],
+                2: [0.5, 0, 0]
+            },
+            "elements": {
+                "POINT_1N": {
+                    1: [1],
+                    2: [2]
+                }
+            },
             "physical_groups": {
-                "points_group": {"ndim": 0, "element_ids": [1, 2], "node_ids": [1, 2], "element_type": "POINT_1N"}
+                "points_group": {
+                    "ndim": 0,
+                    "element_ids": [1, 2],
+                    "node_ids": [1, 2],
+                    "element_type": "POINT_1N"
+                }
             },
         }
 
@@ -54,10 +71,24 @@ class TestMesh:
         # Set up the mesh data
         mesh_data = {
             "ndim": 1,
-            "nodes": {1: [0, 0, 0], 2: [0.5, 0, 0], 3: [1, 0, 0]},
-            "elements": {"LINE_2N": {1: [1, 2], 2: [2, 3]}},
+            "nodes": {
+                1: [0, 0, 0],
+                2: [0.5, 0, 0],
+                3: [1, 0, 0]
+            },
+            "elements": {
+                "LINE_2N": {
+                    1: [1, 2],
+                    2: [2, 3]
+                }
+            },
             "physical_groups": {
-                "lines_group": {"ndim": 1, "element_ids": [1, 2], "node_ids": [1, 2, 3], "element_type": "LINE_2N"}
+                "lines_group": {
+                    "ndim": 1,
+                    "element_ids": [1, 2],
+                    "node_ids": [1, 2, 3],
+                    "element_type": "LINE_2N"
+                }
             },
         }
 
@@ -94,8 +125,21 @@ class TestMesh:
         # Set up the mesh data
         mesh_data = {
             "ndim": 2,
-            "nodes": {1: [0, 0, 0], 2: [0.5, 0, 0], 3: [1, 0, 0], 4: [0, 0.5, 0], 5: [0.5, 0.5, 0], 6: [1, 0.5, 0]},
-            "elements": {"TRIANGLE_3N": {1: [1, 2, 4], 2: [2, 3, 5], 3: [3, 6, 5]}},
+            "nodes": {
+                1: [0, 0, 0],
+                2: [0.5, 0, 0],
+                3: [1, 0, 0],
+                4: [0, 0.5, 0],
+                5: [0.5, 0.5, 0],
+                6: [1, 0.5, 0]
+            },
+            "elements": {
+                "TRIANGLE_3N": {
+                    1: [1, 2, 4],
+                    2: [2, 3, 5],
+                    3: [3, 6, 5]
+                }
+            },
             "physical_groups": {
                 "triangles_group": {
                     "ndim": 2,
@@ -240,16 +284,175 @@ class TestMesh:
         # Set up the mesh data
         mesh_data = {
             "ndim": 0,
-            "nodes": {1: [0, 0, 0], 2: [0.5, 0, 0]},
-            "elements": {"POINT_1N": {1: [1], 2: [2]}},
+            "nodes": {
+                1: [0, 0, 0],
+                2: [0.5, 0, 0]
+            },
+            "elements": {
+                "POINT_1N": {
+                    1: [1],
+                    2: [2]
+                }
+            },
             "physical_groups": {
-                "points_group": {"ndim": 0, "element_ids": [1, 2], "node_ids": [1, 2], "element_type": "POINT_1N"}
+                "points_group": {
+                    "ndim": 0,
+                    "element_ids": [1, 2],
+                    "node_ids": [1, 2],
+                    "element_type": "POINT_1N"
+                }
             },
         }
 
         # Create the mesh from the gmsh group
         with pytest.raises(ValueError):
             Mesh.create_mesh_from_gmsh_group(mesh_data, "non_existing_group")
+
+    def test_is_node_equal(self):
+        """
+        Test the equality of two nodes.
+
+        """
+
+        # Create two equal nodes
+        node1 = Node(1, [0, 0])
+        node2 = Node(1, [0, 0])
+
+        # Check the equality of the two nodes
+        assert node1 == node2
+
+        # change node id of node2
+        node3 = deepcopy(node2)
+        node3.id = 2
+        assert node1 != node3
+
+        # change coordinates of node2
+        node3 = deepcopy(node2)
+        node3.coordinates = [0, 1]
+        assert node1 != node3
+
+        # create a non node object
+        non_node_object = "I am not a node"
+
+        # Check the equality of the node with the non-node object
+        assert node1 != non_node_object
+
+    def test_is_element_equal(self):
+        """
+        Test the equality of two elements.
+
+        """
+
+        # Create two equal elements
+        element1 = Element(1, "TRIANGLE_3N", [1, 2, 3])
+        element2 = Element(1, "TRIANGLE_3N", [1, 2, 3])
+
+        # Check the equality of the two elements
+        assert element1 == element2
+
+        # change element type of element2
+        element3 = deepcopy(element2)
+        element3.element_type = "TRIANGLE_6N"
+        assert element1 != element3
+
+        # change node ids of element2
+        element3 = deepcopy(element2)
+        element3.node_ids = [1, 2, 4]
+        assert element1 != element3
+
+        # create a non element object
+        non_element_object = "I am not an element"
+
+        # Check the equality of the element with the non-element object
+        assert element1 != non_element_object
+
+    def test_is_mesh_equal(self):
+        """
+        Test the equality of two meshes.
+
+        """
+
+        # Create two equal meshes
+        mesh1 = Mesh(2)
+        mesh1.nodes = {1: Node(1, [0, 0]), 2: Node(2, [1, 1])}
+        mesh1.elements = {1: Element(1, "TRIANGLE_3N", [1, 2, 3])}
+
+        mesh2 = Mesh(2)
+        mesh2.nodes = {1: Node(1, [0, 0]), 2: Node(2, [1, 1])}
+        mesh2.elements = {1: Element(1, "TRIANGLE_3N", [1, 2, 3])}
+
+        # Check the equality of the two meshes
+        assert mesh1 == mesh2
+
+        # change dimension of mesh2
+        mesh3 = deepcopy(mesh2)
+        mesh3.ndim = 3
+        assert mesh1 != mesh3
+
+        # change nodes of mesh2
+        mesh3 = deepcopy(mesh2)
+        mesh3.nodes = {1: Node(1, [0, 0]), 2: Node(2, [1, 2])}
+        assert mesh1 != mesh3
+
+        # change elements of mesh2
+        mesh3 = deepcopy(mesh2)
+        mesh3.elements = {1: Element(1, "TRIANGLE_3N", [1, 2, 4])}
+        assert mesh1 != mesh3
+
+        # create a non mesh object
+        non_mesh_object = "I am not a mesh"
+
+        # Check the equality of the mesh with the non-mesh object
+        assert mesh1 != non_mesh_object
+
+    def test_calculate_centroids_multiple_elements(self):
+        """
+        Test the calculation of the centroids of multiple elements.
+
+        """
+
+        # Create a 2D mesh
+        mesh = Mesh(2)
+        mesh.nodes = {
+            1: Node(1, [0, 0, 0]),
+            2: Node(2, [1, 0, 0]),
+            3: Node(3, [0, 1, 0]),
+            4: Node(4, [1, 1, 0]),
+            5: Node(5, [0.5, 0.5, 0])
+        }
+        mesh.elements = {
+            1: Element(1, "TRIANGLE_3N", [1, 5, 2]),
+            2: Element(2, "TRIANGLE_3N", [1, 3, 5]),
+            3: Element(3, "TRIANGLE_3N", [3, 5, 4]),
+            4: Element(4, "TRIANGLE_3N", [2, 5, 4])
+        }
+
+        # Calculate the centroids
+        calculated_centroids = mesh.calculate_centroids()
+
+        expected_centroids = np.array([[0.5, 0.16666667, 0.], [0.16666667, 0.5, 0.], [0.5, 0.83333333, 0.],
+                                       [0.83333333, 0.5, 0.]])
+
+        npt.assert_array_almost_equal(calculated_centroids, expected_centroids)
+
+    def test_calculate_centroids_single_point_element(self):
+        """
+        Test the calculation of the centroids of a single point element.
+
+        """
+
+        # Create a 2D mesh
+        mesh = Mesh(2)
+        mesh.nodes = {1: Node(1, [1, 0, 1])}
+        mesh.elements = {1: Element(1, "POINT_1N", [1])}
+
+        # Calculate the centroids
+        calculated_centroids = mesh.calculate_centroids()
+
+        expected_centroids = np.array([[1, 0, 1]])
+
+        npt.assert_array_almost_equal(calculated_centroids, expected_centroids)
+
 
 class TestMeshSettings:
     """
